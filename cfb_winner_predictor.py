@@ -148,7 +148,7 @@ FEATURES = ["sp_rating_diff","sp_offense_diff","sp_defense_diff","srs_diff",
 
 def default_training_years(now_year: int) -> List[int]:
     # Hardcode the most recent completed seasons to avoid relying on now_year math
-    return [2024, 2023]
+    return [2024]
 
 # -------------------- Training data --------------------
 @st.cache_data(show_spinner=True)
