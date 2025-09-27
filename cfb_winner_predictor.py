@@ -65,7 +65,26 @@ def df_empty(cols: List[str]) -> pd.DataFrame:
     d = {c: pd.Series(dtype="float64") for c in cols}
     if "team" in cols: d["team"] = pd.Series(dtype="object")
     return pd.DataFrame(d)
-
+with st.expander("🔎 Endpoint check (2024 & 2023)", expanded=True):
+    if st.button("Run endpoint check"):
+        import json, time
+        k = st.secrets.get("CFBD_API_KEY", os.getenv("CFBD_API_KEY",""))
+        H = {"Authorization": f"Bearer {k}"} if k else {}
+        def chk(url, params=None):
+            try:
+                r = requests.get(url, headers=H, params=params or {}, timeout=25)
+                return r.status_code, (len(r.json()) if "application/json" in r.headers.get("Content-Type","") else None)
+            except Exception as e:
+                return str(e), None
+        for y in [2024, 2023]:
+            st.write(f"— Year {y} —")
+            st.write("games:", chk("https://api.collegefootballdata.com/games", {"year": y, "seasonType":"regular"}))
+            st.write("sp:",    chk("https://api.collegefootballdata.com/ratings/sp", {"year": y}))
+            st.write("srs:",   chk("https://api.collegefootballdata.com/ratings/srs", {"year": y}))
+            st.write("ppa:",   chk("https://api.collegefootballdata.com/metrics/ppa/teams", {"year": y}))
+            st.write("talent:",chk("https://api.collegefootballdata.com/talent", {"year": y}))
+            st.write("lines:", chk("https://api.collegefootballdata.com/lines", {"year": y}))
+            time.sleep(0.5)
 # -------------------- Safe CFBD wrappers --------------------
 @st.cache_data(show_spinner=False)
 def cfbd_schedule(year: int, season_type: str = "regular") -> pd.DataFrame:
