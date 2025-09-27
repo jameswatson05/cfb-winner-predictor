@@ -87,7 +87,63 @@ def median_home_spread(lines_df: pd.DataFrame, home: str, away: str) -> float:
                     except:
                         pass
     return float(np.nanmedian(vals)) if vals else np.nan
+# ==== Calibration on last season (uses only games/SP+/SRS/lines) ====
+from sklearn.linear_model import LogisticRegression
 
+@st.cache_resource(show_spinner=False)
+def calibrate_weights(cal_year: int = CURRENT_YEAR - 1):
+    g = cfbd_schedule(cal_year)
+    if g.empty:
+        return None
+    g = g[g["homePoints"].notna() & g["awayPoints"].notna()].copy()
+
+    sp  = cfbd_sp(cal_year)
+    srs = cfbd_srs(cal_year)
+    lines = cfbd_lines(cal_year)
+
+    g = g.merge(sp.rename(columns={"team": "homeTeam", "rating": "sp_home"})[["homeTeam","sp_home"]],
+                on="homeTeam", how="left")
+    g = g.merge(sp.rename(columns={"team": "awayTeam", "rating": "sp_away"})[["awayTeam","sp_away"]],
+                on="awayTeam", how="left")
+    g = g.merge(srs.rename(columns={"team": "homeTeam", "srs": "srs_home"})[["homeTeam","srs_home"]],
+                on="homeTeam", how="left")
+    g = g.merge(srs.rename(columns={"team": "awayTeam", "srs": "srs_away"})[["awayTeam","srs_away"]],
+                on="awayTeam", how="left")
+
+    def med_spread(game_id: int) -> float:
+        if lines.empty: return np.nan
+        vals = []
+        for _, r in lines[lines.get("gameId")==game_id].iterrows():
+            for l in r.get("lines", []) if isinstance(r.get("lines"), list) else []:
+                s, hf = l.get("spread"), l.get("homeFavorite")
+                if s is not None and hf is not None:
+                    try:
+                        vals.append(float(s) if hf else -float(s))
+                    except:
+                        pass
+        return float(np.nanmedian(vals)) if vals else np.nan
+
+    g["sp_diff"] = g["sp_home"] - g["sp_away"]
+    g["srs_diff"] = g["srs_home"] - g["srs_away"]
+    g["spread_home"] = g["id"].apply(med_spread)
+    g["home_win"] = (g["homePoints"].astype(float) > g["awayPoints"].astype(float)).astype(int)
+
+    X = g[["sp_diff","srs_diff","spread_home"]].fillna(0.0)
+    y = g["home_win"].astype(int)
+
+    if len(X) < 200:
+        return None
+
+    lr = LogisticRegression(max_iter=200)
+    lr.fit(X, y)
+    return {
+        "coefs": dict(zip(["sp_diff","srs_diff","spread_home"], lr.coef_[0])),
+        "intercept": float(lr.intercept_[0]),
+        "n": int(len(X)),
+        "year": cal_year,
+    }
+
+CAL = calibrate_weights(CURRENT_YEAR - 1)
 def quick_score(sp_diff: float, srs_diff: float, spread_home: float) -> float:
     """
     Simple weighted blend (no training):
