@@ -147,8 +147,8 @@ FEATURES = ["sp_rating_diff","sp_offense_diff","sp_defense_diff","srs_diff",
             "talent_diff","ppa_off_diff","ppa_def_diff","home_field","spread_home"]
 
 def default_training_years(now_year: int) -> List[int]:
-    # Last 3 fully completed seasons = (now_year - 1), (now_year - 2), (now_year - 3)
-    return [now_year-1, now_year-2, now_year-3]
+    # Train on two completed seasons to cut API calls (good for free tier)
+    return [now_year-2, now_year-3]   # e.g., 2023, 2022
 
 # -------------------- Training data --------------------
 @st.cache_data(show_spinner=True)
