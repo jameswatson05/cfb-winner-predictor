@@ -23,7 +23,22 @@ CFBD_API_KEY = os.getenv("CFBD_API_KEY", "")  # fallback if not in Secrets
 st.set_page_config(page_title="CFB Winner Predictor", layout="wide")
 st.title("🏈 College Football Winner Predictor (Moneyline)")
 st.caption("Trains itself on the last 3 completed seasons (SP+, SRS, EPA/PPA, talent, spreads). Just pick this year's week & teams.")
-
+# --- quick diagnostics ---
+with st.expander("🧪 Diagnostics (temporary)", expanded=True):
+    show = st.button("Run key test")
+    if show:
+        k = st.secrets.get("CFBD_API_KEY", os.getenv("CFBD_API_KEY",""))
+        st.write("Key present:", bool(k), "(len:", len(k or ""), ")")
+        try:
+            r = requests.get(
+                "https://api.collegefootballdata.com/teams/fbs",
+                headers={"Authorization": f"Bearer {k}"} if k else {},
+                timeout=20,
+            )
+            st.write("Status:", r.status_code)
+            st.write((r.text or "")[:200])
+        except Exception as e:
+            st.write("Request error:", str(e))
 # -------------------- Keys & HTTP --------------------
 def _key() -> str:
     return st.secrets.get("CFBD_API_KEY", CFBD_API_KEY)
